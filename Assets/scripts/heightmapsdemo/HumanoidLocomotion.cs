@@ -1,37 +1,67 @@
-﻿using UnityEngine;
+﻿// --------------------------------------------------------------------------------------------- //
+// (c) partial pi 2012-2014
+// Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)
+// http://creativecommons.org/licenses/by-nc/4.0/deed.en_US
+// --------------------------------------------------------------------------------------------- //
+
+using UnityEngine;
 using System.Collections;
 using pi.unity.util;
 
 namespace pi.unity.heightmapdemo
 {
+	/// <summary>
+	/// Humanoid locomotion used in the heightmap demo.
+	/// Core features are being able to jump through higher platforms
+	/// and lots of buggy physics. This mechanic is driven
+	/// by switching the active layer of the humanoid to
+	/// colliding / non colliding depending on the state.
+	/// </summary>
 	public class HumanoidLocomotion : MonoBehaviour 
 	{
+		// state tracking what action the humanoid is in
 		public enum LocomotionState
 		{
 			Walking,
 			Jumping,
 			Falling,
-			Landing
 		};
 
+		// force applied to the horizontal axis
 		public float        horizontalForce		  = 8;
+
+		// max velocity over the horizontal axis. Speed will be clamped
+		// to this value.
 		public float 		maxHorizontalVelocity = 3;
-		public float 		orientationDeadZone   = 0.05f;
 
+		// dead zone applying to the current velocity. If
+		// the player's velocity is more than this value 
+		// the character will turn around
+		public float 		facingDeadZone   = 0.05f;
+
+		// max velocity over the vertical axis. Speed will be clamped
+		// to this value.
 		public float		maxVerticalVelocity   = 10;
-		public float		jumpForce 			  = 5;
-		public float		landingDuration 	  = 0.5f;
 
+		// force applied upwards (ie when the player jumps)
+		public float		jumpForce 			  = 5;
+
+		// current state (jump/walk/fall)
 		public  LocomotionState _locoState;
 
+		// flag tracking whether or not the humanoid
+		// is considered to be jumping
+		private bool			_hasReachedJumpVelocity  = false;
+
+		// cached components
 		private Rigidbody2D 	_rigidBody;
 		private Animator		_animator;
 		private BoxCollider2D	_collider;
-		private Color			_gizmoColor = Color.white;
-		private bool			_hasReachedJumpVelocity  = false;
 
-		// Use this for initialization
-		void Start () 
+		/// <summary>
+		/// Collects the necessary components and sets the state to falling.
+		/// </summary>
+		public void Start () 
 		{
 			_rigidBody = gameObject.GetComponent<Rigidbody2D>();
 			_animator  = gameObject.FindComponentByType<Animator>();
@@ -40,7 +70,12 @@ namespace pi.unity.heightmapdemo
 			SetLocomotionState( LocomotionState.Falling );
 		}
 
-		void SetLocomotionState( LocomotionState state )
+		/// <summary>
+		/// Sets the locomotion new locomotion state and
+		/// associated layer.
+		/// </summary>
+		/// <param name="state">State.</param>
+		private void SetLocomotionState( LocomotionState state )
 		{
 			_locoState = state;
 
@@ -48,61 +83,49 @@ namespace pi.unity.heightmapdemo
 			{
 			case LocomotionState.Falling:
 				gameObject.layer = LayerMask.NameToLayer( "fall" );
-				//Debug.Log("fall");
 				break;
 			case LocomotionState.Jumping:
 				gameObject.layer = LayerMask.NameToLayer( "jump" );
-				//Debug.Log("jump");
 				_hasReachedJumpVelocity = false;
 				break;
-			case LocomotionState.Landing:
 			case LocomotionState.Walking:
 			default:
 				break;
 			}
 		}
 
-		// Update is called once per frame
+		/// <summary>
+		/// Update the input, locomotion state and orientation (facing left/right).
+		/// </summary>
 		void Update () 
 		{
-			_gizmoColor = Color.white;
-
 			UpdateInput();
 
 			switch ( _locoState )
 			{
-			case LocomotionState.Falling:
-				UpdateFalling();
-				break;
 			case LocomotionState.Jumping:
 				UpdateJumping();
-				break;
-			case LocomotionState.Landing:
-				UpdateLanding();
-				break;
-			case LocomotionState.Walking:
-				UpdateWalking();
 				break;
 			default:
 				break;
 			}
 
-			UpdateOrientation();
+			UpdateFacingDirection();
 		}
 
+		// read the input and decide on moving and / or jumping
 		private void UpdateInput()
 		{
-			if ( _locoState != LocomotionState.Landing )
-			{
-				UpdateMovementInput();
+			UpdateMovementInput();
 
-				if ( _locoState == LocomotionState.Walking )
-				{
-					UpdateJumpingInput();
-				}
+			if ( _locoState == LocomotionState.Walking )
+			{
+				UpdateJumpingInput();
 			}
 		}
 
+		// check if the input is set to jump - if so
+		// apply a vertical force 
 		private void UpdateJumpingInput()
 		{
 			float v = Input.GetAxis( "Vertical" );
@@ -114,15 +137,17 @@ namespace pi.unity.heightmapdemo
 			}
 		}
 
+		// reads the horizontal input and applies the force accordingly
+		// causing the humanoid to move left or right
 		private void UpdateMovementInput()
 		{
 			float h = Input.GetAxis("Horizontal");
 			
 			_rigidBody.AddForce( h * new Vector2 ( horizontalForce, 0 ) );
-			
+
+			// clamp the velocity
 			if ( Mathf.Abs( _rigidBody.velocity.x ) > maxHorizontalVelocity  )
-			{
-				
+			{				
 				_rigidBody.velocity = ( _rigidBody.velocity.x > 0 ) 
 					?  new Vector2( maxHorizontalVelocity,  _rigidBody.velocity.y )
 						: new Vector2( -maxHorizontalVelocity,  _rigidBody.velocity.y );
@@ -134,110 +159,41 @@ namespace pi.unity.heightmapdemo
 			}
 		}
 
-		private void UpdateFalling()
-		{
-		}
-
-		/*
-		public void OnDrawGizmos()
-		{
-			if ( _collider != null )
-			{
-				float rayCastStartX = gameObject.transform.position.x + _collider.center.x;
-				float rayCastStartY = gameObject.transform.position.y + _collider.center.y + _collider.size.y * 0.5f;
-				Vector2 rayCastStart = new Vector2( rayCastStartX, rayCastStartY );
-
-				Gizmos.color = _gizmoColor;
-				Gizmos.DrawLine( new Vector3( rayCastStart.x, rayCastStart.y, 0 )
-				               , new Vector3( rayCastStart.x, rayCastStartY - 1, 0 ) );
-			}
-		}
-*/
-		private void UpdateWalking()
-		{
-			/*int   layerMask 	= 1 << gameObject.layer;
-			float rayCastStartX = gameObject.transform.position.x + _collider.center.x;
-			float rayCastStartY = gameObject.transform.position.y + _collider.center.y - _collider.size.y * 0.5f;
-			Vector2 rayCastStart = new Vector2( rayCastStartX, rayCastStartY );
-		
-			RaycastHit2D[] hit = Physics2D.RaycastAll( rayCastStart, -Vector2.up, 1, layerMask ); 
-		
-			_gizmoColor = Color.red;
-
-			bool hasHitGround = false;
-
-			if ( hit != null && hit.Length > 0  )
-			{
-
-				for ( int i = 0; i < hit.Length; ++i )
-				{
-					if ( hit[ i ].collider != null && hit[i].collider.gameObject.tag == "Ground" )
-					{
-						_gizmoColor  = Color.green;
-						hasHitGround = true;
-						break;
-					}
-				}
-			}
-
-			if ( !hasHitGround )
-			{
-				SetLocomotionState( LocomotionState.Falling );
-			}*/
-		}
-
+		// callback from engine signalling the humanoid has exited 
+		// from an intersection / collision with the given collider. 
+		// If that is case and since in this demo we only collide with the
+		// ground, we can sort of safely assume the humanoid is falling
 		public void OnCollisionExit2D( Collision2D c )
 		{
-			//if ( c.collider.gameObject.tag == "Ground" && c.collider.gameObject.layer == gameObject.layer )
 			if ( _locoState == LocomotionState.Walking )
 			{
 				SetLocomotionState( LocomotionState.Falling );
-				_gizmoColor = Color.red;
 			}
 		}
 
-		private bool HitsBottomOfCollider( ContactPoint2D[] points )
-		{
-			float bottom = 0.1f + gameObject.transform.position.y + _collider.center.y - _collider.size.y * 0.5f;
-
-			//Debug.Log("bottom = " + bottom  + ", got : " + gameObject.transform.position );
-
-			for ( int i = 0; i < points.Length; i++ )
-			{
-				if ( points[i].point.y <= bottom )
-				{
-			//		Debug.Log("contact at = " + points[i].point.y 
-			//		          + ", with " + LayerMask.LayerToName( points[i].collider.gameObject.layer ) );
-
-					return true;
-				}
-			}
-
-			return false;
-		}
-
+		// callback from the engine signalling the humanoid has run 
+		// into a collision with the given collider. If
+		// the humanoid has been falling it implies it has landed
+		// on a piece of ground
 		public void OnCollisionEnter2D( Collision2D c )
 		{
 			if ( _locoState == LocomotionState.Falling )
 			{
-				if ( IsGroundLayer( c.collider.gameObject.layer ) /*&& HitsBottomOfCollider( c.contacts )*/ )
+				if ( IsGroundLayer( c.collider.gameObject.layer )  )
 				{
 					gameObject.layer = c.collider.gameObject.layer;
-					//Debug.Log(LayerMask.LayerToName(c.collider.gameObject.layer) );
 
 					SetLocomotionState( LocomotionState.Walking );
 				}
 			}
 		}
 
-		/*public void OnCollisionStayD( Collision2D c )
-		{
-			if ( c.collider.gameObject.tag == "Ground" && c.collider.gameObject.layer == gameObject.layer )
-			{
-				_gizmoColor = Color.green;
-			}
-		}*/
-
+		// update the moving state. If the player has reached the necessary 
+		// jump speed, the humanoid can start checking to see if the falling 
+		// condition has been reached. We need this somewhat strange 
+		// check because for the first few frames the humanoid may
+		// not have a positive y velocity and it would seem the humanoid is
+		// falling.
 		private void UpdateJumping()
 		{
 			if ( !_hasReachedJumpVelocity )
@@ -253,10 +209,7 @@ namespace pi.unity.heightmapdemo
 			}
 		}
 
-		private void UpdateLanding()
-		{
-		}
-
+		// checks if the given layer index is a ground layer
 		private bool IsGroundLayer( int layer )
 		{
 			return layer == LayerMask.NameToLayer( "heightmap lv 0" )
@@ -264,15 +217,16 @@ namespace pi.unity.heightmapdemo
 				|| layer == LayerMask.NameToLayer( "heightmap lv 2" );
 		}
 
-		private void UpdateOrientation()
+		// flips the humanoid as needed depending on velocity
+		private void UpdateFacingDirection()
 		{
-			if ( _rigidBody.velocity.x < -orientationDeadZone )
+			if ( _rigidBody.velocity.x < -facingDeadZone )
 			{
 				Vector3 euler = transform.rotation.eulerAngles; 
 				euler.y = 0;
 				_animator.gameObject.transform.rotation = Quaternion.Euler( euler );
 			}
-			else if ( _rigidBody.velocity.x > orientationDeadZone  )
+			else if ( _rigidBody.velocity.x > facingDeadZone  )
 			{
 				Vector3 euler = transform.rotation.eulerAngles; 
 				euler.y = -180;

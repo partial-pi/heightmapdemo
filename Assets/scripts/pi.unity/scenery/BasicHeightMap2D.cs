@@ -1,37 +1,39 @@
-
+// --------------------------------------------------------------------------------------------- //
+// (c) partial pi 2012-2014
+// Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)
+// http://creativecommons.org/licenses/by-nc/4.0/deed.en_US
+// --------------------------------------------------------------------------------------------- //
 
 using UnityEngine;
 
+/// <summary>
+/// 2D Heightmap implementation, creates a heightmap mesh from a bunch of
+/// vector2s
+/// </summary>
 [System.Serializable]
 public class BasicHeightMap2D : IHeightMap2D
 {
-	public  Vector2[] heights;			
+	// heights that make up the map
+	public  Vector2[] heights;	
+
+	// area over which the heightmap will be spread
 	public  float	  width;
 
-	public Vector2   Min
-	{
-		get;
-		private set;
-	}
-
-	public Vector2   Max
-	{
-		get;
-		private set;
-	}
-	
+	// mesh represeting the heightmap
 	public Mesh	HeightMapMesh
 	{
 		get;
 		private set;
 	}
 
+	// x position of the heightmap
 	public float X
 	{
 		get;
 		set;
 	}
-	
+
+	// Width of the heigth map. 
 	public float Width
 	{
 		get
@@ -45,6 +47,7 @@ public class BasicHeightMap2D : IHeightMap2D
 		}
 	}
 
+	// heights that make up the map
 	public Vector2[] Heights
 	{
 		get
@@ -58,13 +61,17 @@ public class BasicHeightMap2D : IHeightMap2D
 		}
 	}
 
+	// build the heightmap using the given filter and the values of the heights property
 	public void BuildHeightMap( MeshFilter filter )
 	{
 		BuildHeightMap( filter, null, 0 );
 	}
 
+	// builds a heightmap using the given filter 
+	// optionally uses the baselayer and offset to build on top of the values of the heights propert 
 	public void BuildHeightMap( MeshFilter filter, Vector2[] baseLayer, float offsetFromBaseLayer )
 	{
+		// if no heights are set bail out - may be that the user hasn't intialized the data
 		if ( heights == null || heights.Length == 0 ) return;
 
 		Vector3[] vertices = new Vector3[ heights.Length * 2 ];
@@ -135,12 +142,13 @@ public class BasicHeightMap2D : IHeightMap2D
 		HeightMapMesh.uv        = uvs;
 		HeightMapMesh.triangles = polygons;
 	}
-
+	// checks if the given value is >= X and smaller than X + Width
 	public bool  IsInRange( float x )
 	{
 		return ( x >= X && x < X + Width );
 	}
 
+	// returns the heigth of this heightmap at the given position
 	public float GetHeight( float worldXPosition )
 	{
 		if ( IsInRange( worldXPosition ) )
@@ -162,6 +170,7 @@ public class BasicHeightMap2D : IHeightMap2D
 		return -1;
 	}
 
+	// returns the normal at the given position
 	public Vector2 GetNormal( float worldXPosition )
 	{
 		if ( IsInRange( worldXPosition ) )
@@ -181,5 +190,4 @@ public class BasicHeightMap2D : IHeightMap2D
 		
 		return new Vector2( 0, 1 );
 	}
-
 }
